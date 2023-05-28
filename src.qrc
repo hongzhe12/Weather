@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>citys.csv</file>
+        <file>logo.ico</file>
+    </qresource>
+</RCC>
