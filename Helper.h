@@ -53,7 +53,7 @@ QString queryCSV(const QList<QStringList>& data, const QString& name)
             return row[1];
         }
     }
-    return QString(); // 返回空字符串表示未找到满足条件的结果
+    return "420300"; // 返回空字符串表示未找到满足条件的结果
 }
 
 

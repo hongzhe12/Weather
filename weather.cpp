@@ -1,16 +1,7 @@
-#include <QCoreApplication>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QEventLoop>
-#include <QDebug>
-
 #include "weather.h"
 #include "ui_weather.h"
-#include "helper.h"
+
+
 
 Weather::Weather(QWidget* parent)
     : QMainWindow(parent)
@@ -18,13 +9,12 @@ Weather::Weather(QWidget* parent)
 {
     ui->setupUi(this);
 
-    // 读取文件
-    data = readCSV("citys.csv");
-    query_str = ui->comboBox->currentText();
-    acode = queryCSV(data, query_str);
+    // 创建数据库连接
+    database = QSqlDatabase::addDatabase("QSQLITE");
+    database.setDatabaseName("my.db");
 
-    qDebug() <<  query_str << acode;
-
+    // 查询数据库
+    data = fetchDataFromField("citys","中文名");
 
     // 将数据写入ComboBox组件
     bool skipHeader = true;
@@ -41,9 +31,36 @@ Weather::Weather(QWidget* parent)
 
 Weather::~Weather()
 {
+    // 关闭数据库连接
+    database.close();
     delete ui;
 }
 
+
+// 查询某个字段的所有数据，返回QList<QStringList>
+QList<QStringList> Weather::fetchDataFromField(const QString& tableName, const QString& fieldName)
+{
+    QList<QStringList> result;
+
+    // 打开数据库
+    if (!database.open()) {
+        qDebug() << "无法打开数据库";
+        return result;
+    }
+
+    // 执行查询
+    QSqlQuery query;
+    query.exec(QString("SELECT %1 FROM %2").arg(fieldName, tableName));
+
+    // 遍历结果集
+    while (query.next()) {
+        QStringList row;
+        QVariant value = query.value(0);
+        row.append(value.toString());
+        result.append(row);
+    }
+    return result;
+}
 
 
 struct WeatherInfo
@@ -137,14 +154,17 @@ QString concatenateWeatherInfo(const WeatherInfo& weatherInfo)
     return result;
 }
 
+// 获取天气按钮
 void Weather::on_pushButtonGetWeather_clicked()
 {
     // 查询当前选择城市的acode
     query_str = ui->comboBox->currentText();
-    acode = queryCSV(data, query_str);
+    adcode = queryAdcodeByChineseName(query_str);
+
+    qDebug() << "获取天气按钮" << query_str << adcode;
 
     QString apiKey = "364c1605664267a5433d9d3ad7c7e8f3"; // 替换为您的天气 API 密钥
-    WeatherInfo weatherInfo = getWeather(apiKey, acode);
+    WeatherInfo weatherInfo = getWeather(apiKey, adcode);
     QString weatherString = concatenateWeatherInfo(weatherInfo);
     qDebug() << weatherString;
     ui->textBrowser->setPlainText(weatherString);
@@ -157,10 +177,43 @@ void Weather::on_pushButtonClear_clicked()
 }
 
 
+// 搜索按钮
 void Weather::on_pushButton_clicked()
 {
     // 查询当前选择城市的acode
-    QString search_str = ui->lineEdit->text();
-    ui->comboBox->setCurrentText(search_str);
+    query_str = ui->lineEdit->text();
+    QString last = adcode;  // 上次的adcode
+    adcode = queryAdcodeByChineseName(query_str);
+    qDebug() << adcode;
+    if(QString::compare(adcode,last) == 0)
+    {
+        QMessageBox::information(this,
+        tr("提示"),
+        tr("城市未查找到！"),
+        QMessageBox::Ok | QMessageBox::Ok);
+
+    }
+    ui->comboBox->setCurrentText(query_str);
+}
+
+
+// 数据库查询函数
+QString Weather::queryAdcodeByChineseName(const QString& chineseName)
+{
+    QSqlQuery query;
+    query.prepare(QString("SELECT adcode FROM %1 WHERE 中文名 = :chineseName").arg("citys"));
+    query.bindValue(":chineseName", chineseName);
+
+    if (!query.exec()) {
+        qDebug() << "查询失败";
+        return "";
+    }
+
+    // 获取查询结果
+    if (query.next()) {
+        QVariant value = query.value(0);
+        adcode = value.toString();
+    }
+    return adcode;
 }
 

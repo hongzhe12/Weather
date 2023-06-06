@@ -1,6 +1,6 @@
 QT       += core gui
 QT       += network
-
+QT       += sql
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
@@ -30,3 +30,6 @@ RESOURCES += \
     src.qrc
 
 RC_ICONS = logo.ico
+
+DISTFILES += \
+    my.db
